@@ -1,0 +1,19 @@
+services:
+  food-safety:
+    build: .
+    container_name: food-safety
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      # 必须改成手机能访问的正式域名（https）
+      PUBLIC_BASE_URL: "https://safety.example.edu.cn"
+      INSPECTOR_PASSWORD: "inspect123"
+      ADMIN_PASSWORD: "admin123"
+      SESSION_SECRET: "CHANGE-ME-openssl-rand-hex-32"
+      MAX_FILE_MB: "8"
+      MAX_ISSUE_IMAGES: "10"
+      MAX_RECTIFY_IMAGES: "4"
+    volumes:
+      - ./data:/app/data        # SQLite 数据库持久化
+      - ./uploads:/app/uploads  # 图片持久化

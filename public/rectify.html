@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>扫码整改 · 校园食安</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">🍜 食堂整改提交<small>扫码 / 输入 key 查看问题并上传整改图</small></div>
+  <div class="actions"><a href="/index.html">首页</a></div>
+</div>
+
+<div class="container">
+
+  <!-- 录入 key / 扫码 -->
+  <div class="card" id="entryCard">
+    <h2>第一步：核对整改 key</h2>
+    <div class="grid grid-2">
+      <div>
+        <label>8 位整改 key（二维码下方的字符）</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="keyInput" maxlength="8"
+                 placeholder="如：K7MP2QH9" style="text-transform:uppercase;
+                 font-family:monospace;font-size:18px;letter-spacing:3px">
+          <button class="btn" id="btnGo">查看问题</button>
+        </div>
+        <div class="muted" id="scanHint"></div>
+      </div>
+      <div>
+        <label>也可以直接扫码</label>
+        <button class="btn secondary" id="btnScan">📷 打开摄像头扫码</button>
+        <video class="scan-video hidden" id="scanVideo" muted playsinline
+               style="margin-top:10px;max-height:260px"></video>
+      </div>
+    </div>
+  </div>
+
+  <!-- 问题详情 -->
+  <div class="card hidden" id="detailCard">
+    <h2>第二步：确认问题并整改</h2>
+    <div id="detailBody"></div>
+  </div>
+
+</div>
+<script src="/js/common.js"></script>
+<script src="/js/rectify.js"></script>
+</body>
+</html>

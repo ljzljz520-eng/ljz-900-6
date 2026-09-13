@@ -1,0 +1,17 @@
+{
+  "name": "campus-food-safety-photos",
+  "version": "1.0.0",
+  "description": "校园食安检查拍照系统：监管老师发码、食堂扫码整改、校领导汇总",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "express": "^4.21.0",
+    "multer": "1.4.5-lts.1",
+    "qrcode": "^1.5.4"
+  }
+}

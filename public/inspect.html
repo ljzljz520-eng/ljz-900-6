@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>监管检查拍照 · 校园食安</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">🔍 监管检查拍照<small>监管老师工作台</small></div>
+  <div class="actions">
+    <a href="/index.html">首页</a>
+    <button class="btn ghost" id="btnLogout">退出</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="card">
+    <h2>一、检查基本信息</h2>
+    <div class="grid grid-3">
+      <div>
+        <label>受检单位（食堂 / 档口）</label>
+        <input type="text" id="unitInput" list="unitList" placeholder="选择或输入新单位" maxlength="100">
+        <datalist id="unitList"></datalist>
+        <div class="muted" id="unitHint"></div>
+      </div>
+      <div>
+        <label>检查日期</label>
+        <input type="date" id="inspectDate">
+      </div>
+      <div>
+        <label>检查人</label>
+        <input type="text" id="inspector" maxlength="50" placeholder="姓名 / 工号">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>二、拍摄 / 选择问题图（最多 <span id="maxN">10</span> 张，单张 ≤ <span id="maxMb">8</span>MB）</h2>
+    <input type="file" id="fileInput" accept="image/jpeg,image/png,image/gif,image/webp"
+           multiple capture="environment" class="hidden">
+    <button class="btn" id="btnPick">📷 拍照 / 选择图片</button>
+    <span class="muted">支持 JPG / PNG / GIF / WEBP；每张图对应一条问题，可分别填写位置、类别、描述。</span>
+    <div id="photoList" style="margin-top:14px"></div>
+  </div>
+
+  <div class="card">
+    <h2>三、提交并生成整改 key</h2>
+    <button class="btn" id="btnSubmit">✅ 提交检查，生成二维码</button>
+    <span class="muted" id="submitHint">提交后每条问题生成唯一 8 位 key 与二维码，可打印发给食堂。</span>
+  </div>
+
+  <div class="card hidden print-area" id="resultCard">
+    <h2>整改二维码（共 <span id="resultCount">0</span> 条，<span class="no-print">可打印 / 截图发食堂负责人</span>）</h2>
+    <div class="no-print" style="margin-bottom:12px">
+      <button class="btn secondary" onclick="window.print()">🖨️ 打印本页二维码</button>
+      <a class="btn secondary" id="csvLink" href="#">⬇️ 导出 key 清单</a>
+    </div>
+    <div class="qr-grid" id="qrGrid"></div>
+  </div>
+
+  <div class="card">
+    <h2>近期检查记录（含整改状态）</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>检查日期</th><th>单位</th><th>位置</th><th>类别</th><th>问题图</th>
+          <th>整改 key</th><th>状态</th><th>整改时间</th>
+        </tr></thead>
+        <tbody id="historyBody"><tr><td colspan="8" class="muted">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="/js/common.js"></script>
+<script src="/js/inspect.js"></script>
+</body>
+</html>

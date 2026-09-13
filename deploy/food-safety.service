@@ -1,0 +1,18 @@
+# systemd 服务单元：/etc/systemd/system/food-safety.service
+[Unit]
+Description=Campus Food Safety Photo System
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/food-safety
+ExecStart=/usr/bin/node server.js
+Environment=NODE_ENV=production
+# 也可改用 EnvironmentFile=/opt/food-safety/.env
+Restart=always
+RestartSec=3
+User=foodsafety
+Group=foodsafety
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>登录 · 校园食安检查</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="topbar"><div class="brand">🛡️ 校园食安检查拍照系统</div></div>
+<div class="login-box">
+  <div class="card">
+    <h2 id="title">登录</h2>
+    <form id="loginForm">
+      <label style="margin-bottom:10px">身份</label>
+      <select id="role" style="margin-bottom:14px">
+        <option value="inspector">监管老师</option>
+        <option value="admin">校领导</option>
+      </select>
+      <label for="password">密码</label>
+      <input type="password" id="password" autofocus placeholder="请输入密码"
+             autocomplete="current-password" style="margin-bottom:18px">
+      <button class="btn big" type="submit">登 录</button>
+    </form>
+    <p style="text-align:center;margin-top:16px">
+      <a href="/index.html">← 返回首页</a>
+    </p>
+  </div>
+</div>
+<script src="/js/common.js"></script>
+<script>
+const q = new URLSearchParams(location.search);
+const roleQ = q.get('role');
+const titleMap = { inspector: '监管老师登录', admin: '校领导登录' };
+if (roleQ === 'inspector' || roleQ === 'admin') {
+  document.getElementById('role').value = roleQ;
+  document.getElementById('title').textContent = titleMap[roleQ];
+}
+document.getElementById('role').addEventListener('change', (e) => {
+  document.getElementById('title').textContent = titleMap[e.target.value] || '登录';
+});
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const role = document.getElementById('role').value;
+  const password = document.getElementById('password').value;
+  try {
+    await FS.api('/api/login', { method: 'POST', body: { role, password } });
+    const next = q.get('next');
+    const fallback = role === 'admin' ? '/dashboard.html' : '/inspect.html';
+    location.href = next && next.startsWith('/') ? next : fallback;
+  } catch (err) {
+    FS.toast(err.message, 'error');
+  }
+});
+</script>
+</body>
+</html>

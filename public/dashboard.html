@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>汇总督办 · 校园食安</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">📊 食安检查汇总督办<small>校领导工作台</small></div>
+  <div class="actions">
+    <a href="/index.html">首页</a>
+    <button class="btn ghost" id="btnLogout">退出</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="card">
+    <h2>筛选条件</h2>
+    <form class="filter-bar" id="filterForm">
+      <div>
+        <label>检查日期 起</label>
+        <input type="date" name="from">
+      </div>
+      <div>
+        <label>检查日期 止</label>
+        <input type="date" name="to">
+      </div>
+      <div>
+        <label>受检单位</label>
+        <select name="unitId" id="unitSelect"><option value="">全部单位</option></select>
+      </div>
+      <div>
+        <label>整改状态</label>
+        <select name="status">
+          <option value="">全部</option>
+          <option value="待整改">待整改</option>
+          <option value="已整改">已整改</option>
+        </select>
+      </div>
+      <div>
+        <button class="btn" type="submit">🔍 查询</button>
+      </div>
+      <div>
+        <button class="btn secondary" type="button" id="btnReset">重置</button>
+      </div>
+      <div>
+        <a class="btn secondary" id="btnExport" href="#">⬇️ 导出 CSV</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>总体情况</h2>
+    <div class="stats">
+      <div class="stat blue"><div class="num" id="sTotal">-</div><div class="lbl">问题总数</div></div>
+      <div class="stat ok"><div class="num" id="sDone">-</div><div class="lbl">已整改</div></div>
+      <div class="stat warn"><div class="num" id="sPending">-</div><div class="lbl">待整改</div></div>
+      <div class="stat"><div class="num" id="sRate">-</div><div class="lbl">整改完成率</div></div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <h2>按单位整改情况</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>单位</th><th>总数</th><th>已整改</th><th>待整改</th><th>完成率</th></tr></thead>
+          <tbody id="unitBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h2>问题类别分布</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>类别</th><th>数量</th><th>占比</th></tr></thead>
+          <tbody id="catBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>问题明细分页（<span id="listCount">0</span> 条）</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>检查日期</th><th>单位</th><th>位置</th><th>类别</th><th>严重</th>
+          <th>问题描述 / 检查人</th><th>问题图</th><th>状态 / 整改信息</th><th>整改图</th>
+        </tr></thead>
+        <tbody id="listBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script src="/js/common.js"></script>
+<script src="/js/dashboard.js"></script>
+</body>
+</html>

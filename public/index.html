@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>校园食安检查拍照系统</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">🛡️ 校园食安检查拍照系统<small>问题拍照 · 扫码整改 · 闭环汇总</small></div>
+</div>
+<div class="container">
+  <div class="hero">
+    <h1>校园食品安全检查闭环管理平台</h1>
+    <p>监管老师拍照建单发码 → 食堂负责人扫码提交整改 → 校领导按日期 / 单位汇总督办</p>
+  </div>
+
+  <div class="role-cards">
+    <div class="role-card">
+      <div class="ico">🔍</div>
+      <h3>监管老师</h3>
+      <p>现场检查、批量上传问题图，为每条问题生成唯一 key 与整改二维码</p>
+      <a class="btn big" href="/inspect.html">进入检查页</a>
+    </div>
+    <div class="role-card" style="border-top-color:#16a34a">
+      <div class="ico">🍜</div>
+      <h3>食堂负责人</h3>
+      <p>扫描二维码或输入 key，查看问题并上传整改照片完成闭环</p>
+      <a class="btn big" style="background:#16a34a" href="/rectify.html">扫码整改</a>
+    </div>
+    <div class="role-card" style="border-top-color:#d97706">
+      <div class="ico">📊</div>
+      <h3>校领导</h3>
+      <p>按检查日期、受检单位筛选汇总，查看整改进度并导出台账 CSV</p>
+      <a class="btn big" style="background:#d97706" href="/dashboard.html">汇总页</a>
+    </div>
+  </div>
+
+  <p class="muted" style="text-align:center;margin-top:26px">
+    默认密码见 .env（INSPECTOR_PASSWORD / ADMIN_PASSWORD），生产部署请及时修改。
+  </p>
+</div>
+</body>
+</html>

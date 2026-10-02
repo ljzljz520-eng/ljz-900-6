@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>问题拍照上传 · 校园食安检查</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="topbar no-print">
+  <h1>📷 校园食品安全检查</h1>
+  <div class="sub">监管老师端 · 上传问题照片并生成整改二维码</div>
+  <nav>
+    <a href="/inspect.html" class="active">问题上传</a>
+    <a href="/admin.html">汇总查询</a>
+  </nav>
+</header>
+
+<main class="container">
+  <section class="card no-print">
+    <h2>检查信息</h2>
+    <div class="field">
+      <label>受检单位（食堂）<span class="req">*</span></label>
+      <input type="text" id="unit" list="unitList" placeholder="如：第一学生食堂" maxlength="50">
+      <datalist id="unitList"></datalist>
+    </div>
+    <div class="field">
+      <label>检查日期<span class="req">*</span></label>
+      <input type="date" id="inspectDate">
+    </div>
+    <div class="field">
+      <label>检查人</label>
+      <input type="text" id="inspector" placeholder="监管老师姓名" maxlength="50">
+    </div>
+  </section>
+
+  <section class="card no-print">
+    <h2>问题照片</h2>
+    <div class="photo-picker" id="picker">
+      <div class="icon">🖼️</div>
+      <div>点击拍照或从相册选择（可多选）</div>
+      <div class="hint">单张不超过 5MB，一次最多 9 张；图片将自动压缩后上传</div>
+    </div>
+    <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" multiple hidden>
+    <div class="photo-grid" id="photoGrid"></div>
+  </section>
+
+  <section class="no-print" style="margin-bottom:16px">
+    <button class="btn btn-primary btn-block" id="submitBtn" disabled>上传并生成整改二维码</button>
+  </section>
+
+  <section id="resultSection" style="display:none">
+    <div class="card no-print" style="background:var(--primary-light)">
+      <b>✅ 已生成 <span id="resultCount"></span> 个整改码</b>
+      <div class="hint">可将二维码打印张贴在整改通知单上，或截图发给对应食堂负责人，扫码即可提交整改照片。</div>
+      <div style="margin-top:10px; display:flex; gap:10px;">
+        <button class="btn btn-primary" onclick="window.print()">🖨️ 打印二维码</button>
+        <button class="btn btn-outline" id="resetBtn">继续下一批</button>
+      </div>
+    </div>
+    <div id="qrHeader" style="display:none; text-align:center; margin-bottom:10px;"></div>
+    <div class="qr-grid" id="qrGrid"></div>
+  </section>
+</main>
+
+<script src="/js/common.js"></script>
+<script>
+const MAX_FILES = 9;
+let photos = []; // {file, url, desc}
+const $ = (id) => document.getElementById(id);
+
+$('inspectDate').value = new Date().toLocaleDateString('sv-SE');
+
+// 已有单位输入联想
+api('/api/units').then(units => {
+  $('unitList').innerHTML = units.map(u => `<option value="${escapeHtml(u)}">`).join('');
+}).catch(() => {});
+
+$('picker').addEventListener('click', () => $('fileInput').click());
+$('fileInput').addEventListener('change', async (e) => {
+  const files = [...e.target.files];
+  e.target.value = '';
+  if (!files.length) return;
+  if (photos.length + files.length > MAX_FILES) {
+    toast(`一次最多 ${MAX_FILES} 张，请分批上传`);
+    return;
+  }
+  for (const f of files) {
+    try {
+      const compressed = await compressImage(f);
+      photos.push({ file: compressed, url: URL.createObjectURL(compressed), desc: '' });
+    } catch (err) { toast(err.message); }
+  }
+  renderPhotos();
+});
+
+function renderPhotos() {
+  $('photoGrid').innerHTML = photos.map((p, i) => `
+    <div class="photo-item">
+      <img src="${p.url}" alt="问题照片${i + 1}">
+      <div class="body">
+        <textarea placeholder="问题描述（选填）" maxlength="200" data-i="${i}">${escapeHtml(p.desc)}</textarea>
+        <button class="remove" data-i="${i}">删除</button>
+      </div>
+    </div>`).join('');
+  $('submitBtn').disabled = photos.length === 0;
+  $('photoGrid').querySelectorAll('textarea').forEach(t =>
+    t.addEventListener('input', () => { photos[+t.dataset.i].desc = t.value; }));
+  $('photoGrid').querySelectorAll('.remove').forEach(b =>
+    b.addEventListener('click', () => { photos.splice(+b.dataset.i, 1); renderPhotos(); }));
+}
+
+$('submitBtn').addEventListener('click', async () => {
+  const unit = $('unit').value.trim();
+  const inspectDate = $('inspectDate').value;
+  const inspector = $('inspector').value.trim();
+  if (!unit) return toast('请填写受检单位');
+  if (!inspectDate) return toast('请选择检查日期');
+  if (!photos.length) return toast('请先选择问题照片');
+
+  const fd = new FormData();
+  fd.append('unit', unit);
+  fd.append('inspect_date', inspectDate);
+  fd.append('inspector', inspector);
+  photos.forEach(p => { fd.append('photos', p.file); fd.append('descriptions', p.desc); });
+
+  const btn = $('submitBtn');
+  btn.disabled = true; btn.textContent = '上传中…';
+  try {
+    const data = await api('/api/issues', { method: 'POST', body: fd });
+    renderResult(data);
+  } catch (err) {
+    toast(err.message, 3000);
+  } finally {
+    btn.disabled = false; btn.textContent = '上传并生成整改二维码';
+  }
+});
+
+function renderResult(data) {
+  $('resultSection').style.display = 'block';
+  $('resultCount').textContent = data.count;
+  $('qrHeader').style.display = 'block';
+  $('qrHeader').innerHTML = `<h3>${escapeHtml(data.unit)} · ${escapeHtml(data.inspect_date)} 检查整改单</h3>`;
+  $('qrGrid').innerHTML = data.items.map((it, i) => `
+    <div class="qr-card">
+      <div style="font-size:.85rem;color:var(--muted)">问题 ${i + 1}${it.description ? ' · ' + escapeHtml(it.description) : ''}</div>
+      <img src="${it.qr}" alt="整改二维码">
+      <div class="qr-key">${it.key}</div>
+      <button class="btn btn-outline no-print" style="padding:6px 14px;font-size:.85rem;margin-top:6px"
+        onclick="navigator.clipboard.writeText('${it.url}').then(()=>toast('链接已复制'))">复制链接</button>
+    </div>`).join('');
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+}
+
+$('resetBtn').addEventListener('click', () => {
+  photos = [];
+  renderPhotos();
+  $('resultSection').style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+</script>
+</body>
+</html>

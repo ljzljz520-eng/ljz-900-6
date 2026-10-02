@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>整改提交 · 校园食安检查</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>🔧 整改提交</h1>
+  <div class="sub">食堂负责人端 · 针对问题照片提交整改结果</div>
+</header>
+
+<main class="container">
+  <div id="loading" class="empty">加载中…</div>
+
+  <div id="content" style="display:none">
+    <section class="card">
+      <h2>问题信息</h2>
+      <div id="issueMeta"></div>
+      <figure class="photo-wrap"><img id="issuePhoto" alt="问题照片"></figure>
+      <div id="issueDesc" style="margin-top:8px"></div>
+    </section>
+
+    <section class="card" id="existingRect" style="display:none">
+      <h2>已提交的整改</h2>
+      <span class="badge badge-rectified">已整改</span>
+      <figure class="photo-wrap"><img id="rectPhoto" alt="整改照片"></figure>
+      <div id="rectInfo" class="hint" style="margin-top:6px"></div>
+    </section>
+
+    <section class="card">
+      <h2 id="formTitle">提交整改</h2>
+      <div class="field">
+        <label>整改后照片<span class="req">*</span></label>
+        <div class="photo-picker" id="picker">
+          <div class="icon">📸</div>
+          <div>点击拍照或从相册选择</div>
+        </div>
+        <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" hidden>
+        <div id="previewWrap" style="display:none;margin-top:10px">
+          <img id="preview" style="border-radius:10px;max-height:260px">
+          <button class="btn btn-outline" id="repick" style="margin-top:8px;padding:6px 14px;font-size:.85rem">重新选择</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>整改说明</label>
+        <textarea id="note" maxlength="200" placeholder="简要说明整改措施（选填）"></textarea>
+      </div>
+      <div class="field">
+        <label>提交人<span class="req">*</span></label>
+        <input type="text" id="submittedBy" maxlength="50" placeholder="姓名">
+      </div>
+      <button class="btn btn-primary btn-block" id="submitBtn">提交整改</button>
+    </section>
+  </div>
+
+  <div id="doneBox" class="card" style="display:none;text-align:center;padding:40px 16px">
+    <div style="font-size:3rem">✅</div>
+    <h2 style="justify-content:center">整改提交成功</h2>
+    <p class="hint">监管老师与校领导可在汇总页查看整改结果</p>
+  </div>
+
+  <div id="errorBox" class="card" style="display:none;text-align:center;padding:40px 16px">
+    <div style="font-size:3rem">⚠️</div>
+    <p id="errorMsg"></p>
+  </div>
+</main>
+
+<script src="/js/common.js"></script>
+<script>
+const key = new URLSearchParams(location.search).get('key') || '';
+let rectFile = null;
+const $ = (id) => document.getElementById(id);
+
+async function load() {
+  if (!key) return showError('链接缺少整改码，请重新扫码');
+  try {
+    const d = await api('/api/issues/' + encodeURIComponent(key));
+    $('loading').style.display = 'none';
+    $('content').style.display = 'block';
+    $('issueMeta').innerHTML = `
+      <span class="badge ${d.status === 'rectified' ? 'badge-rectified' : 'badge-pending'}">${d.status === 'rectified' ? '已整改' : '待整改'}</span>
+      <div class="hint" style="margin-top:6px">单位：${escapeHtml(d.unit)} ｜ 检查日期：${escapeHtml(d.inspect_date)}${d.inspector ? ' ｜ 检查人：' + escapeHtml(d.inspector) : ''}</div>
+      <div class="hint">整改码：<b style="letter-spacing:1px">${escapeHtml(d.key)}</b></div>`;
+    $('issuePhoto').src = d.photo_url;
+    $('issuePhoto').onclick = () => openLightbox(d.photo_url);
+    $('issueDesc').innerHTML = d.description ? `<b>问题描述：</b>${escapeHtml(d.description)}` : '';
+    if (d.rectification) {
+      $('existingRect').style.display = 'block';
+      $('rectPhoto').src = d.rectification.photo_url;
+      $('rectPhoto').onclick = () => openLightbox(d.rectification.photo_url);
+      $('rectInfo').textContent = `${d.rectification.submitted_by || '—'} 提交于 ${d.rectification.created_at}${d.rectification.note ? '：' + d.rectification.note : ''}`;
+      $('formTitle').textContent = '重新提交整改（汇总页将展示最新一条）';
+    }
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+function showError(msg) {
+  $('loading').style.display = 'none';
+  $('errorBox').style.display = 'block';
+  $('errorMsg').textContent = msg;
+}
+
+$('picker').addEventListener('click', () => $('fileInput').click());
+$('fileInput').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  try {
+    rectFile = await compressImage(f);
+    $('preview').src = URL.createObjectURL(rectFile);
+    $('previewWrap').style.display = 'block';
+    $('picker').style.display = 'none';
+  } catch (err) { toast(err.message); }
+});
+$('repick').addEventListener('click', () => {
+  rectFile = null;
+  $('previewWrap').style.display = 'none';
+  $('picker').style.display = 'block';
+});
+
+$('submitBtn').addEventListener('click', async () => {
+  if (!rectFile) return toast('请先拍摄整改后照片');
+  const submittedBy = $('submittedBy').value.trim();
+  if (!submittedBy) return toast('请填写提交人姓名');
+  const fd = new FormData();
+  fd.append('photo', rectFile);
+  fd.append('note', $('note').value.trim());
+  fd.append('submitted_by', submittedBy);
+  const btn = $('submitBtn');
+  btn.disabled = true; btn.textContent = '提交中…';
+  try {
+    await api('/api/rectify/' + encodeURIComponent(key), { method: 'POST', body: fd });
+    $('content').style.display = 'none';
+    $('doneBox').style.display = 'block';
+  } catch (err) {
+    toast(err.message, 3000);
+    btn.disabled = false; btn.textContent = '提交整改';
+  }
+});
+
+load();
+</script>
+</body>
+</html>

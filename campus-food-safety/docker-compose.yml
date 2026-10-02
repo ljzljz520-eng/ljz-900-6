@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - TZ=Asia/Shanghai
+      # 二维码中编码的对外地址，按实际修改：
+      # - BASE_URL=https://food.school.edu.cn
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    restart: unless-stopped

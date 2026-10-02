@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>检查汇总 · 校园食安检查</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>📊 检查整改汇总</h1>
+  <div class="sub">校领导端 · 按检查日期与单位筛选</div>
+  <nav>
+    <a href="/inspect.html">问题上传</a>
+    <a href="/admin.html" class="active">汇总查询</a>
+  </nav>
+</header>
+
+<main class="container">
+  <section class="card">
+    <h2>筛选条件</h2>
+    <div class="filters">
+      <div class="field">
+        <label>检查日期</label>
+        <input type="date" id="fDate">
+      </div>
+      <div class="field">
+        <label>单位</label>
+        <select id="fUnit"><option value="">全部单位</option></select>
+      </div>
+      <div class="field">
+        <label>状态</label>
+        <select id="fStatus">
+          <option value="">全部</option>
+          <option value="pending">待整改</option>
+          <option value="rectified">已整改</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btn btn-primary btn-block" id="queryBtn">查询</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="stats">
+    <div class="stat"><div class="num" id="sTotal">0</div><div class="hint">问题总数</div></div>
+    <div class="stat"><div class="num" id="sPending" style="color:var(--warning)">0</div><div class="hint">待整改</div></div>
+    <div class="stat"><div class="num" id="sRectified" style="color:var(--primary)">0</div><div class="hint">已整改</div></div>
+  </div>
+
+  <div id="list"></div>
+  <div id="empty" class="empty" style="display:none">没有符合条件的记录</div>
+</main>
+
+<script src="/js/common.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+
+async function loadUnits() {
+  try {
+    const units = await api('/api/units');
+    $('fUnit').innerHTML = '<option value="">全部单位</option>' +
+      units.map(u => `<option>${escapeHtml(u)}</option>`).join('');
+  } catch (e) { /* 忽略 */ }
+}
+
+async function query() {
+  const params = new URLSearchParams();
+  if ($('fDate').value) params.set('date', $('fDate').value);
+  if ($('fUnit').value) params.set('unit', $('fUnit').value);
+  if ($('fStatus').value) params.set('status', $('fStatus').value);
+  $('queryBtn').disabled = true;
+  try {
+    const data = await api('/api/summary?' + params);
+    $('sTotal').textContent = data.stats.total;
+    $('sPending').textContent = data.stats.pending;
+    $('sRectified').textContent = data.stats.rectified;
+    $('empty').style.display = data.items.length ? 'none' : 'block';
+    $('list').innerHTML = data.items.map(renderItem).join('');
+    $('list').querySelectorAll('img[data-src]').forEach(img =>
+      img.addEventListener('click', () => openLightbox(img.dataset.src)));
+  } catch (err) {
+    toast(err.message, 3000);
+  } finally {
+    $('queryBtn').disabled = false;
+  }
+}
+
+function renderItem(it) {
+  const badge = it.status === 'rectified'
+    ? '<span class="badge badge-rectified">已整改</span>'
+    : '<span class="badge badge-pending">待整改</span>';
+  const rect = it.rectification ? `
+    <figure>
+      <img data-src="${it.rectification.photo_url}" src="${it.rectification.photo_url}" alt="整改照片" loading="lazy">
+      <figcaption>整改后${it.rectification.submitted_by ? ' · ' + escapeHtml(it.rectification.submitted_by) : ''}</figcaption>
+    </figure>` : '<figure class="no-rect"><figcaption>暂未提交整改</figcaption></figure>';
+  return `
+  <section class="card">
+    <div class="issue-head">
+      <div>
+        <b>${escapeHtml(it.unit)}</b>
+        <span class="hint"> · ${escapeHtml(it.inspect_date)}${it.inspector ? ' · 检查人 ' + escapeHtml(it.inspector) : ''}</span>
+      </div>
+      ${badge}
+    </div>
+    ${it.description ? `<div class="issue-desc">问题：${escapeHtml(it.description)}</div>` : ''}
+    <div class="compare">
+      <figure>
+        <img data-src="${it.photo_url}" src="${it.photo_url}" alt="问题照片" loading="lazy">
+        <figcaption>问题照片 · 码 ${escapeHtml(it.key)}</figcaption>
+      </figure>
+      ${rect}
+    </div>
+    ${it.rectification && it.rectification.note ? `<div class="hint" style="margin-top:6px">整改说明：${escapeHtml(it.rectification.note)}（${it.rectification.created_at}）</div>` : ''}
+  </section>`;
+}
+
+$('queryBtn').addEventListener('click', query);
+loadUnits();
+query(); // 默认加载全部记录
+</script>
+</body>
+</html>

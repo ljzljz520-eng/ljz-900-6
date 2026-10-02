@@ -1,0 +1,20 @@
+{
+  "name": "campus-food-safety",
+  "version": "1.0.0",
+  "private": true,
+  "description": "校园食品安全检查拍照整改系统",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "multer": "^2.0.1",
+    "qrcode": "^1.5.4"
+  }
+}

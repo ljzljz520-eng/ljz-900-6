@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>整改提交（食堂负责人）</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="header">
+  <h1>食品安全 · 整改提交</h1>
+  <p>请拍摄整改后的现场照片并提交</p>
+</div>
+
+<div class="container">
+  <div id="loading" class="loading">加载中…</div>
+
+  <div id="main" style="display:none">
+    <!-- 问题信息 -->
+    <div class="card">
+      <div class="record-head">
+        <span class="unit" id="unitName"></span>
+        <span class="badge" id="statusBadge"></span>
+      </div>
+      <div class="record-meta" id="metaLine"></div>
+      <div class="record-desc" id="descBox" style="display:none"></div>
+      <label>问题照片</label>
+      <img class="img-view" id="problemImg" onclick="openLightbox(this.src)">
+    </div>
+
+    <!-- 已提交的整改（若有） -->
+    <div class="card" id="rectCard" style="display:none">
+      <h2>已提交的整改</h2>
+      <img class="img-view" id="rectImg" onclick="openLightbox(this.src)">
+      <div class="record-meta" id="rectMeta" style="margin-top:8px"></div>
+      <div class="record-desc" id="rectNote" style="display:none"></div>
+      <p class="hint">如需重新提交，请在下方再次上传，新照片将覆盖当前状态。</p>
+    </div>
+
+    <!-- 提交表单 -->
+    <div class="card">
+      <h2 id="formTitle">提交整改</h2>
+      <div id="msg" class="msg"></div>
+
+      <label>整改后照片<span class="req">*</span></label>
+      <div class="photo-grid">
+        <div class="thumb" id="previewBox" style="display:none"><img id="previewImg"></div>
+        <div class="add-btn" id="addBtn"><span class="plus">📷</span><span>拍照上传</span></div>
+      </div>
+      <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" capture="environment" hidden>
+
+      <label>提交人姓名<span class="req">*</span></label>
+      <input type="text" id="submitter" maxlength="50" placeholder="您的姓名">
+
+      <label>联系电话</label>
+      <input type="tel" id="phone" maxlength="20" placeholder="便于核查时联系">
+
+      <label>整改说明</label>
+      <textarea id="note" maxlength="500" placeholder="简述整改措施，如：已重新分区存放并清理积水"></textarea>
+
+      <button class="btn" id="submitBtn">提交整改</button>
+    </div>
+  </div>
+</div>
+
+<script src="/common.js"></script>
+<script>
+const key = new URLSearchParams(location.search).get('key') || '';
+let photoBlob = null;
+
+if (!key) {
+  document.getElementById('loading').textContent = '链接无效：缺少 key 参数，请通过二维码进入';
+} else {
+  loadInfo();
+}
+
+async function loadInfo() {
+  try {
+    const res = await fetch('/api/inspections/' + encodeURIComponent(key));
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '加载失败');
+    render(data);
+  } catch (err) {
+    document.getElementById('loading').textContent = err.message;
+  }
+}
+
+function render(d) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('main').style.display = 'block';
+  document.getElementById('unitName').textContent = d.unit_name;
+  const badge = document.getElementById('statusBadge');
+  badge.textContent = d.status === 'rectified' ? '已整改' : '待整改';
+  badge.className = 'badge ' + d.status;
+  document.getElementById('metaLine').textContent =
+    `检查日期：${d.inspection_date}` +
+    (d.location ? ` · 位置：${d.location}` : '') +
+    (d.inspector_name ? ` · 检查人：${d.inspector_name}` : '');
+  if (d.description) {
+    const box = document.getElementById('descBox');
+    box.style.display = 'block';
+    box.textContent = '问题描述：' + d.description;
+  }
+  document.getElementById('problemImg').src = d.problem_image;
+
+  if (d.rectification) {
+    document.getElementById('rectCard').style.display = 'block';
+    document.getElementById('rectImg').src = d.rectification.image;
+    document.getElementById('rectMeta').textContent =
+      `提交人：${d.rectification.submitter_name} · ${d.rectification.submitted_at}`;
+    if (d.rectification.note) {
+      const n = document.getElementById('rectNote');
+      n.style.display = 'block';
+      n.textContent = '整改说明：' + d.rectification.note;
+    }
+    document.getElementById('formTitle').textContent = '重新提交整改';
+  }
+}
+
+const fileInput = document.getElementById('fileInput');
+document.getElementById('addBtn').onclick = () => fileInput.click();
+fileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    photoBlob = await compressImage(file);
+    document.getElementById('previewImg').src = URL.createObjectURL(photoBlob);
+    document.getElementById('previewBox').style.display = 'block';
+  } catch (err) {
+    showMsg('msg', err.message, 'error');
+  }
+  fileInput.value = '';
+});
+
+document.getElementById('submitBtn').onclick = async () => {
+  if (!photoBlob) return showMsg('msg', '请先拍摄整改后的照片', 'error');
+  const name = document.getElementById('submitter').value.trim();
+  if (!name) return showMsg('msg', '请填写提交人姓名', 'error');
+
+  const fd = new FormData();
+  fd.append('photo', photoBlob, 'rectification.jpg');
+  fd.append('submitter_name', name);
+  fd.append('submitter_phone', document.getElementById('phone').value.trim());
+  fd.append('note', document.getElementById('note').value.trim());
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = '提交中…';
+  try {
+    const res = await fetch('/api/rectifications/' + encodeURIComponent(key), { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '提交失败');
+    showMsg('msg', '✅ 整改提交成功！', 'success');
+    setTimeout(() => location.reload(), 1200);
+  } catch (err) {
+    showMsg('msg', err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '提交整改';
+  }
+};
+</script>
+</body>
+</html>

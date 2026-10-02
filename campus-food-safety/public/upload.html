@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>食安检查 · 问题上报（监管老师）</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="header no-print">
+  <h1>食品安全检查 · 问题上报</h1>
+  <p>监管老师上传问题照片，系统自动为每张照片生成整改二维码</p>
+</div>
+
+<div class="container">
+  <!-- 上报表单 -->
+  <div class="card no-print" id="formCard">
+    <h2>检查信息</h2>
+    <div id="msg" class="msg"></div>
+
+    <label>被检单位（食堂/档口）<span class="req">*</span></label>
+    <input type="text" id="unitName" list="unitList" placeholder="如：第一食堂 / 二食堂三楼档口" maxlength="50">
+    <datalist id="unitList"></datalist>
+
+    <label>具体位置</label>
+    <input type="text" id="location" placeholder="如：后厨粗加工区" maxlength="100">
+
+    <label>检查日期<span class="req">*</span></label>
+    <input type="date" id="inspDate">
+
+    <label>检查人</label>
+    <input type="text" id="inspector" placeholder="您的姓名" maxlength="50">
+
+    <label>问题描述</label>
+    <textarea id="description" placeholder="如：生熟食品未分开存放，地面有积水" maxlength="500"></textarea>
+
+    <label>问题照片（每张将生成一个整改二维码，最多 9 张）<span class="req">*</span></label>
+    <div class="photo-grid" id="photoGrid">
+      <div class="add-btn" id="addBtn">
+        <span class="plus">＋</span><span>拍照/选图</span>
+      </div>
+    </div>
+    <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" multiple hidden>
+    <p class="hint">照片将在手机端自动压缩后上传（单张不超过 8MB，仅支持 JPG/PNG/WebP）</p>
+
+    <button class="btn" id="submitBtn">提交并生成整改二维码</button>
+  </div>
+
+  <!-- 生成结果：二维码列表（可打印） -->
+  <div id="resultArea" style="display:none">
+    <div class="card no-print">
+      <h2>✅ 已生成 <span id="qrCount"></span> 个整改二维码</h2>
+      <p class="hint">请将本页打印后张贴在对应问题位置，食堂负责人扫码即可提交整改照片。</p>
+      <button class="btn secondary" onclick="window.print()">🖨️ 打印二维码</button>
+      <button class="btn" id="newBtn">继续上报新问题</button>
+    </div>
+    <div id="qrList"></div>
+  </div>
+</div>
+
+<script src="/common.js"></script>
+<script>
+const MAX_FILES = 9;
+let photos = []; // { blob, dataUrl }
+
+document.getElementById('inspDate').value = new Date().toISOString().slice(0, 10);
+
+const fileInput = document.getElementById('fileInput');
+document.getElementById('addBtn').onclick = () => fileInput.click();
+
+fileInput.addEventListener('change', async (e) => {
+  for (const file of e.target.files) {
+    if (photos.length >= MAX_FILES) { showMsg('msg', `最多 ${MAX_FILES} 张`, 'error'); break; }
+    try {
+      const blob = await compressImage(file);
+      photos.push({ blob, dataUrl: URL.createObjectURL(blob) });
+    } catch (err) {
+      showMsg('msg', err.message, 'error');
+    }
+  }
+  fileInput.value = '';
+  renderThumbs();
+});
+
+function renderThumbs() {
+  const grid = document.getElementById('photoGrid');
+  grid.querySelectorAll('.thumb').forEach((el) => el.remove());
+  const addBtn = document.getElementById('addBtn');
+  photos.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'thumb';
+    div.innerHTML = `<img src="${p.dataUrl}"><button class="del" data-i="${i}">×</button>`;
+    grid.insertBefore(div, addBtn);
+  });
+  addBtn.style.display = photos.length >= MAX_FILES ? 'none' : 'flex';
+  grid.querySelectorAll('.del').forEach((btn) => {
+    btn.onclick = () => { photos.splice(+btn.dataset.i, 1); renderThumbs(); };
+  });
+}
+
+document.getElementById('submitBtn').onclick = async () => {
+  const unit = document.getElementById('unitName').value.trim();
+  const date = document.getElementById('inspDate').value;
+  if (!unit) return showMsg('msg', '请填写被检单位名称', 'error');
+  if (!date) return showMsg('msg', '请选择检查日期', 'error');
+  if (photos.length === 0) return showMsg('msg', '请至少添加一张问题照片', 'error');
+
+  const fd = new FormData();
+  fd.append('unit_name', unit);
+  fd.append('location', document.getElementById('location').value.trim());
+  fd.append('inspection_date', date);
+  fd.append('inspector_name', document.getElementById('inspector').value.trim());
+  fd.append('description', document.getElementById('description').value.trim());
+  photos.forEach((p, i) => fd.append('photos', p.blob, `problem-${i + 1}.jpg`));
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = '上传中…';
+  try {
+    const res = await fetch('/api/inspections', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '上传失败');
+    showResult(data);
+  } catch (err) {
+    showMsg('msg', err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '提交并生成整改二维码';
+  }
+};
+
+function showResult(data) {
+  document.getElementById('formCard').style.display = 'none';
+  document.getElementById('resultArea').style.display = 'block';
+  document.getElementById('qrCount').textContent = data.count;
+  const unit = document.getElementById('unitName').value.trim();
+  const date = document.getElementById('inspDate').value;
+  const list = document.getElementById('qrList');
+  list.innerHTML = '';
+  data.items.forEach((item, idx) => {
+    const div = document.createElement('div');
+    div.className = 'qr-item';
+    div.innerHTML = `
+      <div class="meta">${escapeHtml(unit)} · ${escapeHtml(date)} · 问题 ${idx + 1}</div>
+      <img src="${item.qrDataUrl}" alt="整改二维码">
+      <div class="key">${item.key}</div>
+      <div class="meta">扫码提交整改照片</div>`;
+    list.appendChild(div);
+  });
+  window.scrollTo(0, 0);
+}
+
+document.getElementById('newBtn').onclick = () => location.reload();
+</script>
+</body>
+</html>

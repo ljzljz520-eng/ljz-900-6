@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>食安检查汇总（校领导）</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="header">
+  <h1>食品安全检查 · 整改汇总</h1>
+  <p>按检查日期与单位筛选，对照查看问题与整改照片</p>
+</div>
+
+<div class="container">
+  <!-- 令牌登录 -->
+  <div class="card" id="loginCard">
+    <h2>🔐 请输入访问令牌</h2>
+    <div id="loginMsg" class="msg"></div>
+    <input type="text" id="tokenInput" placeholder="管理员令牌（由系统管理员提供）" autocomplete="off">
+    <button class="btn" id="loginBtn">进入汇总页</button>
+  </div>
+
+  <div id="main" style="display:none">
+    <!-- 统计 -->
+    <div class="stats-row">
+      <div class="stat"><div class="num" id="statTotal">0</div><div class="lbl">问题总数</div></div>
+      <div class="stat"><div class="num" style="color:var(--success)" id="statRect">0</div><div class="lbl">已整改</div></div>
+      <div class="stat"><div class="num" style="color:var(--warning)" id="statPend">0</div><div class="lbl">待整改</div></div>
+    </div>
+
+    <!-- 筛选 -->
+    <div class="card">
+      <div class="filters">
+        <div>
+          <label>检查日期（起）</label>
+          <input type="date" id="fDateFrom">
+        </div>
+        <div>
+          <label>检查日期（止）</label>
+          <input type="date" id="fDateTo">
+        </div>
+        <div>
+          <label>单位</label>
+          <select id="fUnit"><option value="">全部单位</option></select>
+        </div>
+        <div>
+          <label>状态</label>
+          <select id="fStatus">
+            <option value="">全部</option>
+            <option value="pending">待整改</option>
+            <option value="rectified">已整改</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn" id="searchBtn">查询</button>
+      <button class="btn secondary" id="exportBtn">⬇️ 导出 CSV</button>
+    </div>
+
+    <div id="list"></div>
+    <div class="pager" id="pager" style="display:none">
+      <button class="btn small secondary" id="prevBtn">上一页</button>
+      <span id="pageInfo" style="font-size:13px;color:var(--muted)"></span>
+      <button class="btn small secondary" id="nextBtn">下一页</button>
+    </div>
+  </div>
+</div>
+
+<script src="/common.js"></script>
+<script>
+let token = localStorage.getItem('admin_token') || '';
+let page = 1, totalPages = 1;
+
+document.getElementById('tokenInput').value = token;
+document.getElementById('loginBtn').onclick = doLogin;
+document.getElementById('tokenInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') doLogin(); });
+if (token) tryEnter();
+
+function doLogin() {
+  token = document.getElementById('tokenInput').value.trim();
+  if (!token) return showMsg('loginMsg', '请输入令牌', 'error');
+  tryEnter();
+}
+
+async function tryEnter() {
+  try {
+    const res = await apiFetch('/api/admin/units');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '令牌无效');
+    localStorage.setItem('admin_token', token);
+    document.getElementById('loginCard').style.display = 'none';
+    document.getElementById('main').style.display = 'block';
+    const sel = document.getElementById('fUnit');
+    data.units.forEach((u) => {
+      const o = document.createElement('option');
+      o.value = u; o.textContent = u;
+      sel.appendChild(o);
+    });
+    loadData();
+  } catch (err) {
+    showMsg('loginMsg', err.message, 'error');
+  }
+}
+
+function apiFetch(url) {
+  return fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+}
+
+function queryString() {
+  const p = new URLSearchParams();
+  const from = document.getElementById('fDateFrom').value;
+  const to = document.getElementById('fDateTo').value;
+  const unit = document.getElementById('fUnit').value;
+  const status = document.getElementById('fStatus').value;
+  if (from) p.set('date_from', from);
+  if (to) p.set('date_to', to);
+  if (unit) p.set('unit', unit);
+  if (status) p.set('status', status);
+  return p;
+}
+
+async function loadData() {
+  const qs = queryString();
+  qs.set('page', page);
+  const [sumRes, statRes] = await Promise.all([
+    apiFetch('/api/admin/summary?' + qs),
+    apiFetch('/api/admin/stats?' + queryString()),
+  ]);
+  const sum = await sumRes.json();
+  const stat = await statRes.json();
+  if (!sumRes.ok) return alert(sum.error || '查询失败');
+
+  document.getElementById('statTotal').textContent = stat.total;
+  document.getElementById('statRect').textContent = stat.rectified;
+  document.getElementById('statPend').textContent = stat.pending;
+
+  renderList(sum.items);
+  totalPages = Math.max(1, Math.ceil(sum.total / sum.page_size));
+  const pager = document.getElementById('pager');
+  pager.style.display = totalPages > 1 ? 'flex' : 'none';
+  document.getElementById('pageInfo').textContent = `${page} / ${totalPages} 页（共 ${sum.total} 条）`;
+}
+
+function renderList(items) {
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+  if (items.length === 0) {
+    list.innerHTML = '<div class="card loading">没有符合条件的记录</div>';
+    return;
+  }
+  items.forEach((it) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const rectCol = it.rectification
+      ? `<img class="img-view" src="${it.rectification.image}" onclick="openLightbox(this.src)">
+         <div class="cap">整改后 · ${escapeHtml(it.rectification.submitter_name)} · ${escapeHtml(it.rectification.submitted_at)}</div>`
+      : `<div class="empty-box">暂未提交整改</div><div class="cap">整改后</div>`;
+    card.innerHTML = `
+      <div class="record-head">
+        <span class="unit">${escapeHtml(it.unit_name)}</span>
+        <span class="badge ${it.status}">${it.status === 'rectified' ? '已整改' : '待整改'}</span>
+      </div>
+      <div class="record-meta">
+        📅 ${escapeHtml(it.inspection_date)}
+        ${it.location ? ' · 📍 ' + escapeHtml(it.location) : ''}
+        ${it.inspector_name ? ' · 👤 ' + escapeHtml(it.inspector_name) : ''}
+        · key: ${escapeHtml(it.key)}
+      </div>
+      ${it.description ? `<div class="record-desc">${escapeHtml(it.description)}</div>` : ''}
+      <div class="vs-row">
+        <div class="col">
+          <img class="img-view" src="${it.problem_image}" onclick="openLightbox(this.src)">
+          <div class="cap">问题照片</div>
+        </div>
+        <div class="col">${rectCol}</div>
+      </div>
+      ${it.rectification && it.rectification.note ? `<div class="record-desc" style="margin-top:8px">整改说明：${escapeHtml(it.rectification.note)}</div>` : ''}
+    `;
+    list.appendChild(card);
+  });
+}
+
+document.getElementById('searchBtn').onclick = () => { page = 1; loadData(); };
+document.getElementById('prevBtn').onclick = () => { if (page > 1) { page--; loadData(); } };
+document.getElementById('nextBtn').onclick = () => { if (page < totalPages) { page++; loadData(); } };
+
+document.getElementById('exportBtn').onclick = async () => {
+  const res = await apiFetch('/api/admin/export?' + queryString());
+  if (!res.ok) { const d = await res.json(); return alert(d.error || '导出失败'); }
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `食安检查汇总-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+</script>
+</body>
+</html>
